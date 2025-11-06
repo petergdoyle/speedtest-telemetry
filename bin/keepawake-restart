@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE="$HOME/.cache/keepawake"
+PIDF="$STATE/pid"
+
+dur="${1:-12h}"
+
+if [[ -f "$PIDF" ]]; then
+  pid="$(cat "$PIDF" 2>/dev/null || true)"
+  if [[ -n "${pid:-}" && -e "/proc/$pid" ]]; then
+    kill "$pid" || true
+    echo "Stopped existing keepawake (PID $pid)."
+  else
+    echo "No running keepawake process found."
+  fi
+  rm -f "$PIDF" || true
+fi
+
+SELF_DIR="$(dirname "$0")"
+if [[ -x "$SELF_DIR/keepawake" ]]; then
+  exec "$SELF_DIR/keepawake" "$dur"
+else
+  exec keepawake "$dur"
+fi

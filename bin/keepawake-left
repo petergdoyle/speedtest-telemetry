@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+STATE="$HOME/.cache/keepawake"
+PIDF="$STATE/pid"
+STARTF="$STATE/start_epoch"
+SECSF="$STATE/total_secs"
+
+if [[ ! -f "$PIDF" || ! -f "$STARTF" || ! -f "$SECSF" ]]; then
+  echo "No active keepawake session (state files missing)."
+  exit 0
+fi
+
+pid="$(cat "$PIDF" 2>/dev/null || true)"
+if [[ -z "${pid:-}" || ! -e "/proc/$pid" ]]; then
+  echo "No active keepawake process."
+  exit 0
+fi
+
+start="$(cat "$STARTF")"
+total="$(cat "$SECSF")"
+now="$(date +%s)"
+elapsed="$(( now - start ))"
+left="$(( total - elapsed ))"
+[[ $left -lt 0 ]] && left=0
+
+# pretty print
+fmt() {
+  local s=$1
+  local d=$(( s/86400 )); s=$(( s%86400 ))
+  local h=$(( s/3600 ));  s=$(( s%3600 ))
+  local m=$(( s/60 ));    s=$(( s%60 ))
+  [[ $d -gt 0 ]] && printf "%dd " "$d"
+  [[ $h -gt 0 ]] && printf "%dh " "$h"
+  [[ $m -gt 0 ]] && printf "%dm " "$m"
+  printf "%ds\n" "$s"
+}
+
+echo "Keepawake active (PID $pid). Time remaining: $(fmt "$left")"

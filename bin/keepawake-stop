@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+STATE="$HOME/.cache/keepawake"
+PIDF="$STATE/pid"
+
+if [[ ! -f "$PIDF" ]]; then
+  echo "No keepawake PID file found."
+  exit 0
+fi
+
+pid="$(cat "$PIDF" 2>/dev/null || true)"
+if [[ -n "${pid:-}" && -e "/proc/$pid" ]]; then
+  kill "$pid" || true
+  echo "Stopped keepawake (PID $pid)."
+else
+  echo "No running keepawake process."
+fi
+
+rm -f "$PIDF"

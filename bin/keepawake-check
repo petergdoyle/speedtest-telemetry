@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Show any BLOCK inhibitors (means sleep is prevented)
+blocks="$(systemd-inhibit --list | awk '$5=="sleep" && $7=="block" {print}')"
+if [[ -n "$blocks" ]]; then
+  echo "✅ Sleep inhibition ACTIVE (BLOCK present). Full list:"
+else
+  echo "🚫 No BLOCK inhibitors active (system may sleep). Full list:"
+fi
+systemd-inhibit --list

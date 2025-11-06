@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+STATE="$HOME/.cache/keepawake"
+PIDF="$STATE/pid"
+STARTF="$STATE/start_epoch"
+SECSF="$STATE/total_secs"
+
+parse_secs() {
+  local t="${1:-}"; [[ -z "$t" ]] && return 1
+  case "$t" in
+    *s) printf '%d\n' "${t%s}";;
+    *m) printf '%d\n' "$(( ${t%m} * 60 ))";;
+    *h) printf '%d\n' "$(( ${t%h} * 3600 ))";;
+    *d) printf '%d\n' "$(( ${t%d} * 86400 ))";;
+    *)  printf '%d\n' "$t" 2>/dev/null || return 1;;
+  esac
+}
+
+usage() { echo "Usage: keepawake <duration>  e.g. keepawake 12h"; }
+
+[[ $# -lt 1 ]] && { usage; exit 1; }
+
+dur="$1"
+secs="$(parse_secs "$dur" || true)"
+[[ -z "${secs:-}" ]] && { echo "Invalid duration: $dur"; usage; exit 1; }
+
+mkdir -p "$STATE"
+now="$(date +%s)"
+echo "$now" > "$STARTF"
+echo "$secs" > "$SECSF"
+
+# run inhibitor in background
+systemd-inhibit --mode=block --what=sleep --why="Manual keep-awake request" sleep "$dur" &
+echo $! > "$PIDF"
+echo "Keeping system awake for $dur (PID $(cat "$PIDF"))."
+echo "Run: keepawake-left   # to see time remaining"
+echo "Run: keepawake-stop   # to cancel early"

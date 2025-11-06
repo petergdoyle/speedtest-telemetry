@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERBOSE=0
+[[ "${1:-}" == "--verbose" || "${1:-}" == "-v" ]] && VERBOSE=1
+
+STATE="$HOME/.cache/keepawake"
+PIDF="$STATE/pid"
+STARTF="$STATE/start_epoch"
+SECSF="$STATE/total_secs"
+
+fmt_time() {
+  local s=${1:-0}; (( s<0 )) && s=0
+  local d=$(( s/86400 )); s=$(( s%86400 ))
+  local h=$(( s/3600 ));  s=$(( s%3600 ))
+  local m=$(( s/60 ));    s=$(( s%60 ))
+  local out=""
+  [[ $d -gt 0 ]] && out+="${d}d "
+  [[ $h -gt 0 ]] && out+="${h}h "
+  [[ $m -gt 0 ]] && out+="${m}m "
+  out+="${s}s"
+  echo "$out"
+}
+
+STATUS="inactive"
+REMAIN="n/a"
+if [[ -f "$PIDF" && -f "$STARTF" && -f "$SECSF" ]]; then
+  pid="$(cat "$PIDF" 2>/dev/null || true)"
+  if [[ -n "${pid:-}" && -e "/proc/$pid" ]]; then
+    now=$(date +%s)
+    start=$(cat "$STARTF" 2>/dev/null || echo "$now")
+    total=$(cat "$SECSF" 2>/dev/null || echo 0)
+    left=$(( total - (now - start) ))
+    (( left < 0 )) && left=0
+    REMAIN="$(fmt_time "$left")"
+    STATUS="active (PID $pid)"
+  fi
+fi
+
+BLOCKS="$(systemd-inhibit --list | awk '$5=="sleep" && $7=="block" {print}' || true)"
+if [[ -n "$BLOCKS" ]]; then
+  INHIB="BLOCK present"
+  ICON="✅"
+else
+  INHIB="no BLOCK"
+  ICON="🚫"
+fi
+
+echo "$ICON keepawake: $STATUS | remaining: $REMAIN | inhibitors: $INHIB"
+
+if (( VERBOSE )); then
+  echo "---- systemd-inhibit --list ----"
+  systemd-inhibit --list
+fi
