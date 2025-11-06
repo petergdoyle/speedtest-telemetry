@@ -1,0 +1,7 @@
+[Unit]
+Description=Speedtest Telemetry Logger (single run)
+
+[Service]
+Type=oneshot
+ExecStart=%h/speedtest-logs/scripts/speedtest-log.sh
+WorkingDirectory=%h/speedtest-logs

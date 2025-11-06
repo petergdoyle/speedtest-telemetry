@@ -1,0 +1,12 @@
+[Unit]
+Description=Speedtest Telemetry Dashboard
+
+[Service]
+WorkingDirectory=%h/speedtest-logs/dashboard
+ExecStart=%h/speedtest-logs/dashboard/speedtest-dashboard-env-run.sh
+Restart=on-failure
+Environment=SPEEDTEST_CSV=../data/speedtest.csv
+Environment=DASH_PORT=8050
+
+[Install]
+WantedBy=default.target
