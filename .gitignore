@@ -1,0 +1,18 @@
+# Speedtest LOG DATA
+data/speedtest.csv
+data/raw/
+data/errors.log
+data/.speedtest.lock
+
+# macOS fluff (just in case)
+.DS_Store
+
+# Vim swap files
+*.swp
+*.swo
+
+# Python/virtual env artifacts if you expand later
+__pycache__/
+*.pyc
+.venv/
+
