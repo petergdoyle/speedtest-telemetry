@@ -1,0 +1,13 @@
+[Unit]
+Description=Prevent system sleep for speedtest telemetry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# This command keeps the system awake indefinitely
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who="Speedtest Telemetry" --why="Continuous network telemetry collection" sleep infinity
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
