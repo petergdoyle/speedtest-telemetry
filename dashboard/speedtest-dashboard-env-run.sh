@@ -41,4 +41,4 @@ pip install -r requirements.txt
 
 # Launch app
 echo "🌐 Launching dashboard on port ${DASH_PORT:-8050}..."
-python app.py
+python streamlit_app.py
