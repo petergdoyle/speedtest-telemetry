@@ -16,10 +16,11 @@ GLOBAL_MAX_TRIES=10         # safety cap across all servers
 CMD_TIMEOUT=60              # seconds per attempt
 BACKOFF_BASE=5              # seconds; grows linearly per attempt
 
-BASE_DIR="$HOME/speedtest-logs/data"
+# System-wide locations (match service hardening)
+BASE_DIR="/var/lib/speedtest-telemetry"
 CSV="$BASE_DIR/speedtest.csv"
 RAW_DIR="$BASE_DIR/raw"
-ERR_LOG="$BASE_DIR/errors.log"
+ERR_LOG="/var/log/speedtest-telemetry/errors.log"
 LOCK="$BASE_DIR/.speedtest.lock"
 
 # Telemetry targets
