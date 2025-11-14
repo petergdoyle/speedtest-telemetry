@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+
+  speedtest-logger:
+    build:
+      context: .
+      dockerfile: Dockerfile.logger
+    container_name: speedtest-logger-service
+    restart: unless-stopped
+    environment:
+      SPEEDTEST_CSV: /var/lib/speedtest-telemetry/speedtest.csv
+      SPEEDTEST_RAW: /var/lib/speedtest-telemetry/raw
+      SPEEDTEST_REFRESH: 300
+    volumes:
+      - /var/lib/speedtest-telemetry:/var/lib/speedtest-telemetry
+      - /var/log/speedtest-diag.log:/var/log/speedtest-diag.log
+
+  speedtest-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: speedtest-dashboard-service
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      SPEEDTEST_CSV: /var/lib/speedtest-telemetry/speedtest.csv
+      SPEEDTEST_RAW: /var/lib/speedtest-telemetry/raw
+      SPEEDTEST_REFRESH: 60
+    volumes:
+      - /var/lib/speedtest-telemetry:/var/lib/speedtest-telemetry

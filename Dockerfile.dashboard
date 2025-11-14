@@ -1,0 +1,27 @@
+# -----------------------------
+# Dockerfile.logger
+# -----------------------------
+FROM python:3.11-slim
+
+# Install system packages needed by Python or speedtest binaries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app directory
+WORKDIR /app
+
+# Copy only what logger needs
+COPY requirements.txt .
+COPY scripts/speedtest-logger.py ./scripts/
+
+# Install Python dependencies (minimal)
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Environment variables (overridden by docker-compose)
+ENV SPEEDTEST_CSV=/var/lib/speedtest-telemetry/speedtest.csv
+ENV SPEEDTEST_RAW=/var/lib/speedtest-telemetry/raw
+ENV SPEEDTEST_REFRESH=300
+
+# Default command (runs logger once)
+CMD ["python", "scripts/speedtest-logger.py"]
