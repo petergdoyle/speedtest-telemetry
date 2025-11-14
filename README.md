@@ -6,7 +6,7 @@ Autodiscovers nearby servers (`speedtest -L`) and falls back to a static list. C
 ## Repo Layout
 speedtest-logs/
 ├── scripts/
-│ └── speedtest-log.sh
+│ └── speedtest-logger.sh
 ├── data/
 │ ├── speedtest.csv
 │ ├── raw/
@@ -27,7 +27,7 @@ sudo apt install -y jq dnsutils curl
 ```
 
 ## Run once
-./scripts/speedtest-log.sh
+./scripts/speedtest-logger.sh
 tail -2 data/speedtest.csv
 
 ## CSV Header

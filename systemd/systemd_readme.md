@@ -175,7 +175,7 @@ Wants=network-online.target
 Type=oneshot
 WorkingDirectory=%h/speedtest-logs
 EnvironmentFile=%h/speedtest-logs/config.env
-ExecStart=%h/speedtest-logs/scripts/speedtest-log.sh
+ExecStart=%h/speedtest-logs/scripts/speedtest-logger.sh
 
 [Install]
 WantedBy=default.target
@@ -183,7 +183,7 @@ WantedBy=default.target
 
 Ensure the script is executable:
 ```bash
-chmod +x ~/speedtest-logs/scripts/speedtest-log.sh
+chmod +x ~/speedtest-logs/scripts/speedtest-logger.sh
 ```
 
 ---

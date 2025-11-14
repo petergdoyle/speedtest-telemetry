@@ -3,5 +3,5 @@ Description=Speedtest Telemetry Logger (single run)
 
 [Service]
 Type=oneshot
-ExecStart=%h/speedtest-logs/scripts/speedtest-log.sh
+ExecStart=%h/speedtest-logs/scripts/speedtest-logger.sh
 WorkingDirectory=%h/speedtest-logs

@@ -18,7 +18,7 @@ fi
 echo "==> Sync project to $DEST_CODE"
 sudo mkdir -p "$DEST_CODE"
 sudo rsync -a --delete --exclude=".git" --exclude=".github" --exclude="__pycache__" "$SRC"/ "$DEST_CODE"/
-sudo chmod +x "$DEST_CODE/scripts/speedtest-log.sh"
+sudo chmod +x "$DEST_CODE/scripts/speedtest-logger.sh"
 
 echo "==> Prepare data and log dirs"
 sudo mkdir -p "$DEST_DATA/raw"
@@ -60,7 +60,7 @@ User=speedtest
 Group=speedtest
 WorkingDirectory=/opt/speedtest-telemetry
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/opt/speedtest-telemetry/scripts/speedtest-log.sh
+ExecStart=/opt/speedtest-telemetry/scripts/speedtest-logger.sh
 TimeoutStartSec=30min
 # Hardening (optional):
 NoNewPrivileges=true

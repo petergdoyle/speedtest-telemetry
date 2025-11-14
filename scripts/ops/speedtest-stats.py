@@ -11,7 +11,7 @@ Responsibilities:
 - Append ONLY successful runs with valid CSV format to the main CSV log.
 - Log structured diagnostics (JSON lines) for failures with reason codes.
 
-Intended to be triggered by a systemd timer instead of the legacy speedtest-log.sh.
+Intended to be triggered by a systemd timer instead of the legacy speedtest-logger.sh.
 """
 
 import json
