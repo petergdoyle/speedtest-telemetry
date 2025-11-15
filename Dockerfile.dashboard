@@ -1,27 +1,29 @@
 # -----------------------------
-# Dockerfile.logger
+# Dockerfile.dashboard
 # -----------------------------
 FROM python:3.11-slim
 
-# Install system packages needed by Python or speedtest binaries
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates iputils-ping \
+    curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app directory
 WORKDIR /app
 
-# Copy only what logger needs
+# Copy requirements + dashboard code
 COPY requirements.txt .
-COPY scripts/speedtest-logger.py ./scripts/
+COPY dashboard/ ./dashboard/
 
-# Install Python dependencies (minimal)
+# Install dashboard Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Environment variables (overridden by docker-compose)
+# Default ports
+EXPOSE 8501
+
+# Environment overrides via docker-compose
 ENV SPEEDTEST_CSV=/var/lib/speedtest-telemetry/speedtest.csv
 ENV SPEEDTEST_RAW=/var/lib/speedtest-telemetry/raw
-ENV SPEEDTEST_REFRESH=300
+ENV SPEEDTEST_REFRESH=60
 
-# Default command (runs logger once)
-CMD ["python", "scripts/speedtest-logger.py"]
+# Run Streamlit
+CMD ["streamlit", "run", "dashboard/streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
