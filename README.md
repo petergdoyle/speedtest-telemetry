@@ -30,6 +30,21 @@ make run
 ```
 3. View the live web dashboard at: [http://localhost:8501](http://localhost:8501)
 
+## Modifying Speedtest Frequency
+The frequency of the speedtest log runs is managed by a systemd timer inside the container. By default, it runs every 15 minutes.
+
+To change this, edit `systemd/system/speedtest-logger.timer`:
+```ini
+[Timer]
+OnCalendar=*:0/15
+```
+Change `*:0/15` to your desired schedule (e.g. `*:0/30` for every 30 minutes, or `hourly`).
+
+After making changes to this file, rebuild and restart the container:
+```bash
+make build && make run
+```
+
 ## Makefile Commands
 
 The project uses a `Makefile` to simplify deployment and management.
