@@ -162,14 +162,16 @@ write_ok_row() {
   SID=$(echo "$RESULT"    | jq -r '.server.id      // "unknown"')
   ISP=$(echo "$RESULT"    | jq -r '.isp           // "unknown"' | tr ',' ';')
 
-  echo "$TS,$DL,$UL,$PING,$JITTER,$LOSS,$SNAME,$SID,$ISP,${gw_avg:-},${gw_loss:-},${cf_avg:-},${cf_loss:-},${g_avg:-},${g_loss:-},${dns_ms:-},${http_ms:-},$WIFI_IFACE,$WIFI_SSID,$WIFI_BAND,ok," >> "$CSV"
+  # 21 commas = 22 fields
+  echo "$TS,$DL,$UL,$PING,$JITTER,$LOSS,\"$SNAME\",$SID,\"$ISP\",${gw_avg:-},${gw_loss:-},${cf_avg:-},${cf_loss:-},${g_avg:-},${g_loss:-},${dns_ms:-},${http_ms:-},$WIFI_IFACE,\"$WIFI_SSID\",$WIFI_BAND,ok," >> "$CSV"
 }
 
 write_fail_row() {
   local TS="$1" MSG="$2" gw_avg="$3" gw_loss="$4" cf_avg="$5" cf_loss="$6" g_avg="$7" g_loss="$8" dns_ms="$9" http_ms="${10}"
   local ERR
   ERR=$(echo "$MSG" | tr '\n' ' ' | sed 's/,/;/g' | cut -c1-240)
-  echo "$TS,,,,,,, ,${gw_avg:-},${gw_loss:-},${cf_avg:-},${cf_loss:-},${g_avg:-},${g_loss:-},${dns_ms:-},${http_ms:-},$WIFI_IFACE,$WIFI_SSID,$WIFI_BAND,fail,\"$ERR\"" >> "$CSV"
+  # 21 commas: 1:TS, 2-9:empty, 10-15:pings, 16-17:telemetry, 18-20:wifi, 21:fail, 22:error
+  echo "$TS,,,,,,,,,${gw_avg:-},${gw_loss:-},${cf_avg:-},${cf_loss:-},${g_avg:-},${g_loss:-},${dns_ms:-},${http_ms:-},$WIFI_IFACE,\"$WIFI_SSID\",$WIFI_BAND,fail,\"$ERR\"" >> "$CSV"
 }
 
 discover_servers() {
@@ -199,9 +201,9 @@ detect_wifi_context
 
 # ICMP/DNS/HTTP telemetry first (so we still log even if speedtest fails)
 GW="$(gw_ip)"
-read -r GW_AVG GW_LOSS <<< "$(ping_stats "${GW:-127.0.0.1}")"
-read -r CF_AVG CF_LOSS <<< "$(ping_stats 1.1.1.1)"
-read -r G_AVG  G_LOSS  <<< "$(ping_stats 8.8.8.8)"
+IFS=',' read -r GW_AVG GW_LOSS <<< "$(ping_stats "${GW:-127.0.0.1}")"
+IFS=',' read -r CF_AVG CF_LOSS <<< "$(ping_stats 1.1.1.1)"
+IFS=',' read -r G_AVG  G_LOSS  <<< "$(ping_stats 8.8.8.8)"
 DNS_MS="$(dns_time_ms)"
 HTTP_MS="$(http_time_ms)"
 
