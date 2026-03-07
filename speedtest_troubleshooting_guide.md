@@ -1,209 +1,100 @@
-# Speedtest Telemetry Troubleshooting Guide
+# Speedtest Telemetry Troubleshooting Guide (Docker Edition)
 
-This guide provides a systematic process for verifying and repairing the `speedtest-telemetry` app if it stops logging data. Follow these steps in order.
-
----
-
-## 0) Set Variables (once per shell)
-```bash
-# CHANGE this to your project root
-PROJ=~/speedtest-telemetry
-cd "$PROJ"
-```
+This guide provides a systematic process for verifying and repairing the `speedtest-telemetry` stack running inside Docker.
 
 ---
 
-## 1) Verify that new data is missing
+## 1) Check Container Status
+The first step is ensuring the container is actually running and healthy.
+
 ```bash
-ls -lh data/speedtest.csv
-tail -n 5 data/speedtest.csv
-stat -c "mtime: %y" data/speedtest.csv
+# Check if the container is running
+docker ps --filter "name=speedtest-telemetry"
+
+# Check the last 100 lines of general container output
+make logs
 ```
-- If `mtime` is older than 24–48 hours → logging has stopped.
+
+- **If the container is missing**: Run `make run`.
+- **If the container is "Exited"**: Check `make logs` for initialization errors.
 
 ---
 
-## 2) Check for error logs
+## 2) Verify Systemd Services
+Inside the container, we use systemd to manage the schedule. 
+
 ```bash
-[ -f data/errors.log ] && tail -n 50 data/errors.log || echo "No errors.log"
+# Check the status of the timer and the dashboard service
+docker exec speedtest-telemetry systemctl status speedtest-logger.timer speedtest-dashboard.service
 ```
+
+- **`speedtest-logger.timer`**: Must be `active (waiting)`. This triggers the runs.
+- **`speedtest-dashboard.service`**: Must be `active (running)`. This serves the UI.
 
 ---
 
-## 3) Look for stale lock files
-```bash
-if [ -f data/.speedtest.lock ]; then
-  echo "Lock age:"; stat -c "%y" data/.speedtest.lock
-  # if older than ~1hr, it's likely stale:
-  find data/.speedtest.lock -mmin +60 -print -exec rm -v {} \;
-else
-  echo "No lock present."
-fi
-```
+## 3) Inspect Service Logs
+If a specific service is failing, tail its dedicated journal logs:
 
----
+```bash
+# View logs for the telemetry logger script
+make logger-logs
 
-## 4) Verify Ookla Speedtest CLI availability
-```bash
-command -v speedtest || echo "speedtest CLI not on PATH"
-speedtest --version || echo "Speedtest exists but failed to run"
-```
-If missing, reinstall:
-```bash
-curl -s https://packagecloud.io/install/repositories/ookla/speedtest/script.deb.sh | sudo bash
-sudo apt-get install -y speedtest
+# View logs for the Streamlit dashboard
+make dashboard-logs
 ```
 
 ---
 
-## 5) Run the capture script manually
+## 4) Manual Data Verification
+Verify that the CSV is actually being written to the persistent volume.
+
 ```bash
-chmod +x scripts/run_speedtest.sh 2>/dev/null || true
-./scripts/run_speedtest.sh && tail -n 3 data/speedtest.csv
-```
-- If data appends to CSV → scheduling issue (cron/systemd)
-- If fails → check `data/errors.log`
+# Check the CSV header and last 5 rows
+docker exec speedtest-telemetry tail -n 5 /var/lib/speedtest-telemetry/speedtest.csv
 
----
-
-## 6) Verify environment
-Ensure the following:
-- `data/` exists and is writable
-- `speedtest` is on PATH
-- Python/venv are used only for dashboard/notebook layers
-
-Quick check:
-```bash
-mkdir -p data/raw
-touch data/smoke.txt && rm data/smoke.txt
+# Check for script-level errors
+docker exec speedtest-telemetry cat /var/lib/speedtest-telemetry/errors.log
 ```
 
 ---
 
-## 7) Cron Configuration
-### Inspect crontab
-```bash
-crontab -l | sed -n '1,120p'
-sudo crontab -l | sed -n '1,120p' || true
-```
+## 5) Force a Manual Test Run
+If you don't want to wait for the 15-minute timer, trigger a run immediately:
 
-### Recommended user crontab
 ```bash
-MAILTO=""
-SHELL=/bin/bash
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
-# Every 15 minutes with lock
-*/15 * * * * cd $HOME/speedtest-telemetry && ./scripts/run_speedtest.sh >> data/errors.log 2>&1
+make test
 ```
+Then check `make logger-logs` to see it execute in real-time.
 
 ---
 
-## 8) Systemd Timer Alternative
-Check status:
-```bash
-systemctl --user status speedtest-telemetry.timer speedtest-telemetry.service
-journalctl --user -u speedtest-telemetry.service -n 100 --no-pager
-```
+## 6) Common Docker/Proxmox Issues
 
-### Service file (~/.config/systemd/user/speedtest-telemetry.service)
-```
-[Unit]
-Description=Run speedtest telemetry capture
-
-[Service]
-Type=oneshot
-WorkingDirectory=%h/speedtest-telemetry
-ExecStart=%h/speedtest-telemetry/scripts/run_speedtest.sh
-```
-
-### Timer file (~/.config/systemd/user/speedtest-telemetry.timer)
-```
-[Unit]
-Description=Run speedtest telemetry every 15 minutes
-
-[Timer]
-OnBootSec=2min
-OnUnitActiveSec=15min
-Unit=speedtest-telemetry.service
-
-[Install]
-WantedBy=timers.target
-```
-
-Activate:
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now speedtest-telemetry.timer
-systemctl --user list-timers | grep speedtest-telemetry
-```
-
----
-
-## 9) Health Check Script
-Save as `scripts/health_check.sh`:
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")/.."
-
-echo "=== CSV ==="
-[ -f data/speedtest.csv ] && { wc -l data/speedtest.csv; stat -c "mtime: %y" data/speedtest.csv; } || echo "missing"
-
-echo "=== Lock ==="
-if [ -f data/.speedtest.lock ]; then
-  stat -c "lock mtime: %y" data/.speedtest.lock
-  find data/.speedtest.lock -mmin +60 -print -exec rm -v {} \;
-else
-  echo "no lock"
-fi
-
-echo "=== Errors tail ==="
-[ -f data/errors.log ] && tail -n 30 data/errors.log || echo "no errors.log"
-
-echo "=== speedtest CLI ==="
-command -v speedtest && speedtest --version || echo "speedtest not available"
-
-echo "=== Cron user ==="
-crontab -l || echo "no user crontab"
-
-echo "=== Systemd user timer ==="
-systemctl --user list-timers | (grep speedtest-telemetry || true)
-```
-Run:
-```bash
-chmod +x scripts/health_check.sh
-./scripts/health_check.sh
-```
-
----
-
-## 10) Common Issues & Fixes
 | Issue | Symptom | Fix |
 |--------|----------|------|
-| **Stale lock** | `.speedtest.lock` exists for hours | Delete it using `find ... -exec rm` |
-| **Cron PATH issue** | `speedtest` not found | Add PATH in crontab |
-| **Permissions** | Files owned by root | `sudo chown -R "$USER":"$USER" "$PROJ"` |
-| **Device sleeps** | No runs during sleep | `sudo systemctl mask sleep.target suspend.target` |
-| **Disk full** | `df -h` near 100% | Rotate or delete old logs |
-| **Binary moved** | CLI path changed | Reinstall or export PATH again |
+| **Cgroup v2 Error** | Container fails to start systemd | Ensure the host has Cgroup v2 enabled and `privileged: true` is in `docker-compose.yml`. |
+| **LXC Nesting** | Systemd fails inside LXC | (Proxmox only) Enable **Nesting** and **FUSE** in LXC Options. |
+| **Port Conflict** | `make run` fails on port 8501 | Change `8501:8501` in `docker-compose.yml` to another port (e.g., `9000:8501`). |
+| **Permission Denied** | Logs won't write to `/var/lib/...` | The container runs as root by default. Ensure the host path for the volume is accessible. |
+| **Speedtest CLI Crash** | `std::logic_error` in logs | Ensure `Environment=HOME=/root` is set in the systemd service file (it should be by default in this repo). |
 
 ---
 
-## 11) Test the CLI directly
+## 7) Interactive Debugging
+If all else fails, "ssh" into the container to run commands manually:
+
 ```bash
-speedtest --accept-license --accept-gdpr -f json > /tmp/st.json && jq '.type, .ping.latency, .download.bandwidth, .upload.bandwidth' /tmp/st.json
+make shell
+# Inside the container:
+/app/scripts/speedtest-log.sh
 ```
-- Fails → network or CLI issue
-- Works → script or scheduling issue
 
 ---
 
 ## Summary
-Run the health check first. If issues persist:
-1. Check for stale lock
-2. Verify cron/systemd timers
-3. Validate CLI and permissions
-
-If the manual run works but automation doesn’t, the root cause is always **PATH**, **permissions**, or **scheduler config**.
+1. Use `make help` to see all diagnostic commands.
+2. Check `make logger-logs` for speedtest failures.
+3. Check `make dashboard-logs` for Streamlit/UI failures.
+4. Ensure your host supports `systemd` inside Docker (Privileged mode).
 
