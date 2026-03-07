@@ -115,6 +115,8 @@ with st.sidebar:
     max_ts = pd.to_datetime(df["timestamp"].max())
     min_ts = pd.to_datetime(df["timestamp"].min())
     default_start = max_ts - timedelta(days=7)
+    if default_start < min_ts:
+        default_start = min_ts
 
     date_range = st.date_input(
         "Date range",
