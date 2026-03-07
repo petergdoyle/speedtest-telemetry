@@ -176,7 +176,7 @@ discover_servers() {
   # Parse first column (ID) after the "====" divider; take top SERVER_LIMIT
   # Handles leading spaces; prints only numeric IDs
   mapfile -t SERVERS < <(
-    "$BIN" -L 2>/dev/null | awk '
+    "$BIN" -L --accept-license --accept-gdpr 2>/dev/null | awk '
       /^=+/ {start=1; next}
       start && /^[[:space:]]*[0-9]+/ {
         gsub(/^[[:space:]]+/, "", $1);

@@ -5,3 +5,5 @@ Description=Speedtest Telemetry Logger (single run)
 Type=oneshot
 ExecStart=/app/scripts/speedtest-log.sh
 WorkingDirectory=/app
+Environment=HOME=/root
+Environment=SPEEDTEST_DATA=/var/lib/speedtest-telemetry
