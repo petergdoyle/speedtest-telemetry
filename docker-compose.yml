@@ -1,0 +1,15 @@
+
+services:
+  speedtest-telemetry:
+    build: .
+    container_name: speedtest-telemetry
+    restart: unless-stopped
+    privileged: true # Required to run systemd inside the container
+    ports:
+      - "8501:8501"
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw # Also required for systemd
+      - speedtest-data:/var/lib/speedtest-telemetry
+
+volumes:
+  speedtest-data:

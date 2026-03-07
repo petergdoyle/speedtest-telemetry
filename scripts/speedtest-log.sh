@@ -17,10 +17,10 @@ CMD_TIMEOUT=60              # seconds per attempt
 BACKOFF_BASE=5              # seconds; grows linearly per attempt
 
 # System-wide locations (match service hardening)
-BASE_DIR="/var/lib/speedtest-telemetry"
+BASE_DIR="${SPEEDTEST_DATA:-/var/lib/speedtest-telemetry}"
 CSV="$BASE_DIR/speedtest.csv"
 RAW_DIR="$BASE_DIR/raw"
-ERR_LOG="/var/log/speedtest-telemetry/errors.log"
+ERR_LOG="$BASE_DIR/errors.log"
 LOCK="$BASE_DIR/.speedtest.lock"
 
 # Telemetry targets

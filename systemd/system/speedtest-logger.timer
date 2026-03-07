@@ -1,0 +1,9 @@
+[Unit]
+Description=Run Speedtest Logger on a schedule
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

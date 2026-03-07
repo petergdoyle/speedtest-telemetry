@@ -26,19 +26,24 @@ export SPEEDTEST_CSV="$CSV_PATH"
 echo "📄 Resolved CSV path: $SPEEDTEST_CSV"
 
 # Create virtual environment if missing
-if [ ! -d ".venv" ]; then
-  echo "🧱 Creating virtual environment..."
-  python3 -m venv .venv
+if [ ! -d "/app/.venv" ]; then
+  if [ ! -d ".venv" ]; then
+    echo "🧱 Creating virtual environment..."
+    python3 -m venv .venv
+  fi
+  source .venv/bin/activate
+else
+  # Use global docker venv
+  source /app/.venv/bin/activate
 fi
 
-# Activate environment
-source .venv/bin/activate
-
 # Install dependencies
-echo "📦 Installing dependencies..."
+echo "📦 Installing dependencies from $(pwd)/requirements.txt..."
 pip install --upgrade pip
-pip install -r requirements.txt
+if [ -f "requirements.txt" ]; then
+  pip install -r requirements.txt
+fi
 
 # Launch app
-echo "🌐 Launching dashboard on port ${DASH_PORT:-8050}..."
-python streamlit_app.py
+echo "🌐 Launching dashboard on port ${DASH_PORT:-8501}..."
+streamlit run streamlit_app.py --server.port="${DASH_PORT:-8501}" --server.address=0.0.0.0

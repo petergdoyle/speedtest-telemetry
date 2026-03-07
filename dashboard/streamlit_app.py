@@ -43,8 +43,8 @@ st.caption(f"CSV: `{CSV_PATH}` · Raw JSON: `{RAW_DIR}`")
 
 # Optional auto-refresh (disabled if 0)
 if AUTO_REFRESH_SECS > 0:
-    st.experimental_set_query_params(_=str(int(datetime.utcnow().timestamp())))
-    st.autorefresh = st.experimental_rerun  # noop placeholder to avoid lints
+    st.query_params._ = str(int(datetime.utcnow().timestamp()))
+    st.autorefresh = st.rerun  # noop placeholder to avoid lints
     st.write(f"⏱️ Auto-refresh ~ every {AUTO_REFRESH_SECS}s (reload the page to reset).")
 
 # ──────────────────────────────────────────────────────────────────────────────
