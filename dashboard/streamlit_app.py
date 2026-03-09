@@ -155,6 +155,26 @@ if vf.empty:
 for col in ["download_mbps", "upload_mbps", "ping_ms"]:
     vf[f"{col}_ma{ma_window}"] = vf[col].rolling(ma_window, min_periods=1).median()
 
+# Sidebar Download
+with st.sidebar:
+    st.markdown("---")
+    # We download the canonical columns (not the MA ones)
+    expected_cols = [
+        "timestamp", "download_mbps", "upload_mbps", "ping_ms", "jitter_ms", "packet_loss",
+        "server_name", "server_id", "isp", "gw_ping_ms", "gw_loss_pct", "cf_ping_ms",
+        "cf_loss_pct", "g_ping_ms", "g_loss_pct", "dns_ms", "http_ms", "wifi_iface",
+        "wifi_ssid", "wifi_band", "status", "error"
+    ]
+    download_df = vf[[c for c in expected_cols if c in vf.columns]]
+    csv_bytes = download_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Data (CSV)",
+        data=csv_bytes,
+        file_name=f"speedtest_{date_range[0]}_{date_range[1]}.csv",
+        mime="text/csv",
+        help="Download the filtered data matching your current view."
+    )
+
 # ──────────────────────────────────────────────────────────────────────────────
 # KPIs
 # ──────────────────────────────────────────────────────────────────────────────
