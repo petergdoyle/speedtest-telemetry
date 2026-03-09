@@ -208,7 +208,7 @@ ul_line = base.mark_line().encode(
     tooltip=['timestamp:T','upload_mbps:Q','wifi_band:N','wifi_ssid:N']
 )
 
-band_color = alt.Color('wifi_band:N', legend=alt.Legend(title='Wi‑Fi Band'))
+band_color = alt.Color('wifi_band:N', legend=alt.Legend(title='Network Band'))
 
 st.subheader("Throughput Over Time (smoothed)")
 st.altair_chart(
@@ -228,14 +228,14 @@ lat = base.transform_fold(
 )
 st.altair_chart(lat, use_container_width=True)
 
-# 3) Distribution by Band
-st.subheader("Distribution by Wi‑Fi Band")
-box = alt.Chart(vf).mark_boxplot(extent='min-max').encode(
-    x=alt.X('wifi_band:N', title='Wi‑Fi Band'),
-    y=alt.Y('download_mbps:Q', title='Download (Mb/s)'),
+# 3) Band distribution
+st.subheader("Distribution by Network Band")
+dist = alt.Chart(vf).mark_bar().encode(
+    x=alt.X('wifi_band:N', title='Network Band'),
+    y=alt.Y('download_mbps:Q', aggregate='median', title='Median Download (Mb/s)'),
     color='wifi_band:N'
 )
-st.altair_chart(box, use_container_width=True)
+st.altair_chart(dist, use_container_width=True)
 
 st.divider()
 

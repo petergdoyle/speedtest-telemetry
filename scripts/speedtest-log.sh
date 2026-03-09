@@ -186,6 +186,12 @@ for IFACE in "${INTERFACES[@]}"; do
   WIFI_SSID="none"
   WIFI_BAND="none"
 
+  # Initial set for default or non-detected interfaces
+  if [ "$IFACE" = "default" ] || [ "$IFACE" = "eth0" ]; then
+    WIFI_SSID="Wired"
+    WIFI_BAND="Ethernet"
+  fi
+
   if [ "$IFACE" != "default" ]; then
     # Try to determine if it's wifi
     if command -v iwgetid >/dev/null 2>&1 && iwgetid "$IFACE" >/dev/null 2>&1; then
