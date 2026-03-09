@@ -51,7 +51,7 @@ if AUTO_REFRESH_SECS > 0:
 # Data Loading & Normalization
 # ──────────────────────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
-def load_csv(path: str) -> pd.DataFrame:
+def load_csv(path: str, mtime: float) -> pd.DataFrame:
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_csv(path)
@@ -99,7 +99,8 @@ def load_csv(path: str) -> pd.DataFrame:
     return df
 
 
-df = load_csv(CSV_PATH)
+csv_mtime = os.path.getmtime(CSV_PATH) if os.path.exists(CSV_PATH) else 0
+df = load_csv(CSV_PATH, csv_mtime)
 
 if df.empty or df["timestamp"].isna().all():
     st.info("No data yet. Trigger a run or check the CSV path.")
