@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y \
     jq \
     dnsutils \
     iproute2 \
+    iw \
+    wireless-tools \
+    kmod \
     python3 \
     python3-pip \
     python3-venv \

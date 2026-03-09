@@ -130,8 +130,8 @@ with st.sidebar:
     bands = [b for b in sorted(df["wifi_band"].dropna().unique()) if b]
     ssids = [s for s in sorted(df["wifi_ssid"].dropna().unique()) if s]
 
-    band_sel = st.multiselect("Wi‑Fi Band", options=bands, default=bands)
-    ssid_sel = st.multiselect("SSID", options=ssids, default=ssids)
+    band_sel = st.multiselect("Network Band", options=bands, default=bands, help="Filter by Wi‑Fi band (2.4/5GHz) or Wired Ethernet.")
+    ssid_sel = st.multiselect("Connected Network (SSID)", options=ssids, default=ssids, help="Filter by Wi‑Fi SSID or 'Wired' connection.")
 
     # Moving average window
     ma_window = st.slider("Moving Avg (samples)", 1, 21, 5, help="Smoothing window for trend lines")

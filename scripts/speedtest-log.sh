@@ -65,49 +65,7 @@ fi
 # HELPERS
 ############################
 # --- Wi-Fi context (iface/ssid/band) ---
-detect_wifi_context() {
-  WIFI_IFACE="none"; WIFI_SSID="none"; WIFI_BAND="none"
-  if command -v nmcli >/dev/null 2>&1; then
-    # Active Wi-Fi interface
-    local dev
-    dev=$(nmcli -t -f DEVICE,TYPE,STATE device | awk -F: '$2=="wifi" && $3=="connected"{print $1; exit}')
-    if [ -n "$dev" ]; then
-      WIFI_IFACE="$dev"
-      # SSID of the active connection for this device
-      WIFI_SSID=$(nmcli -t -f DEVICE,CONNECTION device | awk -F: -v d="$dev" '$1==d{print $2; exit}')
-      # Active frequency for this device
-      local freq
-      freq=$(nmcli -t -f ACTIVE,SSID,FREQ dev wifi list ifname "$dev" 2>/dev/null | awk -F: '$1=="yes"{print $3; exit}')
-      # freq could be like "2412 MHz" or "5.2 GHz"; extract number (in MHz if present) else the GHz number
-      if echo "$freq" | grep -qi 'ghz'; then
-        # Extract numeric GHz
-        val=$(echo "$freq" | awk '{print $1}' | sed 's/[^0-9\.]//g')
-        if awk "BEGIN{exit !($val >= 3.0)}"; then WIFI_BAND="5 GHz"; else WIFI_BAND="2.4 GHz"; fi
-      elif echo "$freq" | grep -qi 'mhz'; then
-        mhz=$(echo "$freq" | sed 's/[^0-9]//g')
-        if [ -n "$mhz" ] && [ "$mhz" -ge 3000 ]; then WIFI_BAND="5 GHz"; else WIFI_BAND="2.4 GHz"; fi
-      fi
-    fi
-  else
-    # Fallback to iw utilities if nmcli unavailable
-    if command -v iwgetid >/dev/null 2>&1; then
-      dev_guess=$(iwgetid -r 2>/dev/null)
-      [ -n "$dev_guess" ] && WIFI_SSID="$dev_guess"
-    fi
-    if command -v iwconfig >/dev/null 2>&1; then
-      line=$(iwconfig 2>/dev/null | awk '/IEEE 802.11/{print; exit}')
-      if [ -n "$line" ]; then
-        WIFI_IFACE=$(echo "$line" | awk '{print $1}')
-        freq=$(echo "$line" | sed -n 's/.*Frequency=\([0-9\.]\+\).*/\1/p')
-        if [ -n "$freq" ]; then
-          if awk "BEGIN{exit !($freq >= 3.0)}"; then WIFI_BAND="5 GHz"; else WIFI_BAND="2.4 GHz"; fi
-        fi
-      fi
-    fi
-  fi
-  # sanitize commas in SSID for CSV
-  WIFI_SSID=${WIFI_SSID//,/;}
-}
+# DEPRECATED: Context is now determined per-interface in the main loop.
 
 ts() { date +"%Y-%m-%d %H:%M:%S"; }
 
@@ -117,8 +75,9 @@ gw_ip() {
 
 # returns "avg_ms,loss_pct"; if no reply, avg empty, loss=100
 ping_stats() {
-  local target="$1" count="${2:-5}" out avg loss
-  out=$(ping -n -c "$count" -w $((count+1)) "$target" 2>/dev/null || true)
+  local target="$1" count="${2:-5}" opts="${3:-}" out avg loss
+  # shellcheck disable=SC2086
+  out=$(ping $opts -n -c "$count" -w $((count+1)) "$target" 2>/dev/null || true)
   avg=$(echo "$out"  | awk -F'/' '/^(rtt|round-trip)/ {print $5}')
   loss=$(echo "$out" | awk -F', *' '/packets transmitted/ {gsub(/%/,"",$3); print $3}')
   [ -z "${avg:-}" ] && avg=""
@@ -195,51 +154,102 @@ exec 9>"$LOCK"
 flock -n 9 || exit 0
 
 TSNOW="$(ts)"
-# Detect Wi-Fi context for this run
-detect_wifi_context
 
+# --- Interface Discovery ---
+# We look for physical-looking interfaces that are UP and have an IP (excluding loopback)
+# Common prefixes: eth, en (ethernet), wlan, wl (wifi)
+mapfile -t INTERFACES < <(ip -br addr show | awk '$2=="UP" && $1 !~ /^lo/ && $1 !~ /^docker/ && $1 !~ /^veth/ {print $1}')
 
-# ICMP/DNS/HTTP telemetry first (so we still log even if speedtest fails)
-GW="$(gw_ip)"
-IFS=',' read -r GW_AVG GW_LOSS <<< "$(ping_stats "${GW:-127.0.0.1}")"
-IFS=',' read -r CF_AVG CF_LOSS <<< "$(ping_stats 1.1.1.1)"
-IFS=',' read -r G_AVG  G_LOSS  <<< "$(ping_stats 8.8.8.8)"
-DNS_MS="$(dns_time_ms)"
-HTTP_MS="$(http_time_ms)"
-
-# Build dynamic server list
-SERVERS=()
-discover_servers
-if [ ${#SERVERS[@]} -eq 0 ]; then
-  # fallback to static if discovery failed
-  SERVERS=("${STATIC_SERVERS[@]}")
-  echo "$TSNOW server discovery failed; using static list: ${SERVERS[*]}" >> "$ERR_LOG"
+if [ ${#INTERFACES[@]} -eq 0 ]; then
+  # Fallback to default behavior if no interfaces found
+  INTERFACES=("default")
 fi
 
-total_tries=0
-last_err=""
+for IFACE in "${INTERFACES[@]}"; do
+  # --- Context for this interface ---
+  WIFI_IFACE="$IFACE"
+  WIFI_SSID="none"
+  WIFI_BAND="none"
 
-for sid in "${SERVERS[@]}"; do
-  for (( i=1; i<=TRIES_PER_SERVER; i++ )); do
-    total_tries=$((total_tries+1))
-    result="$(run_speedtest_once "$sid" 2>&1)"; rc=$?
-    if [ $rc -eq 0 ] && echo "$result" | jq -e . >/dev/null 2>&1; then
-      write_ok_row "$TSNOW" "$result" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
-      exit 0
+  if [ "$IFACE" != "default" ]; then
+    # Try to determine if it's wifi
+    if command -v iwgetid >/dev/null 2>&1 && iwgetid "$IFACE" >/dev/null 2>&1; then
+      WIFI_SSID=$(iwgetid -r "$IFACE" 2>/dev/null || echo "unknown")
+      # Determine band
+      line=$(iwconfig "$IFACE" 2>/dev/null | awk '/IEEE 802.11/{print; exit}')
+      freq=$(echo "$line" | sed -n 's/.*Frequency=\([0-9\.]\+\).*/\1/p')
+      if [ -n "$freq" ]; then
+        if awk "BEGIN{exit !($freq >= 4.0)}"; then WIFI_BAND="5 GHz"; else WIFI_BAND="2.4 GHz"; fi
+      fi
     else
-      short_err="$(echo "$result" | tr '\n' ' ' | cut -c1-240)"
-      echo "$TSNOW sid=$sid try=$i rc=$rc err=$short_err" >> "$ERR_LOG"
-      last_err="$short_err"
-      sleep $((BACKOFF_BASE * i))
+      # Check if it's ethernet/wired
+      WIFI_SSID="Wired"
+      WIFI_BAND="Ethernet"
     fi
-    if [ $total_tries -ge $GLOBAL_MAX_TRIES ]; then
-      write_fail_row "$TSNOW" "$last_err" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
-      exit 1
-    fi
+  fi
+
+  # ICMP/DNS/HTTP telemetry (interface-specific if possible)
+  GW="$(ip route show dev "$IFACE" 2>/dev/null | awk '/default/ {print $3; exit}')"
+  [ -z "$GW" ] && GW=$(ip route 2>/dev/null | awk '/^default/ {print $3; exit}')
+  
+  # For pings, we try to bind to the interface
+  PING_OPTS=""
+  [ "$IFACE" != "default" ] && PING_OPTS="-I $IFACE"
+  
+  IFS=',' read -r GW_AVG GW_LOSS <<< "$(ping_stats "${GW:-127.0.0.1}" 5 "$PING_OPTS")"
+  IFS=',' read -r CF_AVG CF_LOSS <<< "$(ping_stats 1.1.1.1 5 "$PING_OPTS")"
+  IFS=',' read -r G_AVG  G_LOSS  <<< "$(ping_stats 8.8.8.8 5 "$PING_OPTS")"
+  
+  # Dig doesn't easily bind to an interface name, but curl can
+  DNS_MS="$(dns_time_ms)"
+  HTTP_MS=""
+  if [ "$IFACE" != "default" ]; then
+    HTTP_MS=$(curl --interface "$IFACE" -o /dev/null -s -w '%{time_total}' "$HTTP_URL" || echo "")
+    [ -n "$HTTP_MS" ] && HTTP_MS=$(awk -v s="$HTTP_MS" 'BEGIN{printf "%.0f", s*1000}')
+  else
+    HTTP_MS="$(http_time_ms)"
+  fi
+
+  # Build dynamic server list
+  SERVERS=()
+  discover_servers
+  if [ ${#SERVERS[@]} -eq 0 ]; then
+    SERVERS=("${STATIC_SERVERS[@]}")
+  fi
+
+  total_tries=0
+  last_err=""
+  SUCCESS=0
+
+  for sid in "${SERVERS[@]}"; do
+    for (( i=1; i<=TRIES_PER_SERVER; i++ )); do
+      total_tries=$((total_tries+1))
+      
+      # Run speedtest bound to interface
+      cmd=("$BIN" "--accept-license" "--accept-gdpr" "--format=json" "--progress=no")
+      [ -n "$sid" ] && cmd+=("--server-id" "$sid")
+      [ "$IFACE" != "default" ] && cmd+=("--interface" "$IFACE")
+      
+      result=$(timeout "$CMD_TIMEOUT" "${cmd[@]}" 2>&1); rc=$?
+      
+      if [ $rc -eq 0 ] && echo "$result" | jq -e . >/dev/null 2>&1; then
+        write_ok_row "$TSNOW" "$result" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
+        SUCCESS=1
+        break 2
+      else
+        short_err="$(echo "$result" | tr '\n' ' ' | cut -c1-240)"
+        echo "$TSNOW iface=$IFACE sid=$sid try=$i rc=$rc err=$short_err" >> "$ERR_LOG"
+        last_err="$short_err"
+        sleep $((BACKOFF_BASE * i))
+      fi
+      [ $total_tries -ge $GLOBAL_MAX_TRIES ] && break 2
+    done
   done
+
+  if [ $SUCCESS -eq 0 ]; then
+    write_fail_row "$TSNOW" "$last_err" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
+  fi
 done
 
-# all failed
-write_fail_row "$TSNOW" "$last_err" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
-exit 1
+exit 0
 
