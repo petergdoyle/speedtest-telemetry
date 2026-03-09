@@ -60,6 +60,11 @@ shell:
 test:
 	docker exec $(CONTAINER_NAME) systemctl start speedtest-logger.service
 
+# Run a comprehensive diagnostic check inside the container
+debug:
+	@chmod +x scripts/debug-systemd.sh
+	@docker exec $(CONTAINER_NAME) bash -c "chmod +x /app/scripts/debug-systemd.sh && /app/scripts/debug-systemd.sh"
+
 # Remove the container and the associated data volume (Destructive!)
 clean:
 	docker compose down -v
