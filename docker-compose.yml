@@ -4,7 +4,9 @@ services:
     container_name: speedtest-telemetry
     restart: unless-stopped
     privileged: true # Required to run systemd inside the container
-    network_mode: host # Allows direct access to host network interfaces
+    # network_mode: host # REQUIRED for Linux/Proxmox to see physical interfaces. (Disabled on Mac/Windows)
+    ports:
+      - "8501:8501" # Required for bridge networking
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw # Also required for systemd
       - speedtest-data:/var/lib/speedtest-telemetry

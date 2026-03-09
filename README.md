@@ -30,6 +30,11 @@ make run
 ```
 3. View the live web dashboard at: [http://localhost:8501](http://localhost:8501)
 
+### 🌐 Networking Note (Linux vs. Mac/Windows)
+- **Local Testing (Mac/Windows)**: Use the default configuration (Bridge mode). Port `8501` is mapped automatically.
+- **Production (Linux/Proxmox)**: It is **highly recommended** to switch to `network_mode: host` in `docker-compose.yml`. This allows the script to see your physical hardware interfaces (Ethernet, Wi-Fi) and achieves the most accurate speed results.
+  - *Note*: On Mac/Windows, `host` networking is not supported for port mapping and will make the dashboard unreachable.
+
 ## Modifying Speedtest Frequency
 The frequency of the speedtest log runs is managed by a systemd timer inside the container. By default, it runs every 15 minutes.
 
@@ -67,10 +72,10 @@ Data is stored internally in `/var/lib/speedtest-telemetry/speedtest.csv`.
 
 **Header:**
 ```csv
-timestamp,download_mbps,upload_mbps,ping_ms,jitter_ms,packet_loss,server_name,server_id,isp,gw_ping_ms,gw_loss_pct,cf_ping_ms,cf_loss_pct,g_ping_ms,g_loss_pct,dns_ms,http_ms,status,error
+timestamp,download_mbps,upload_mbps,ping_ms,jitter_ms,packet_loss,server_name,server_id,isp,gw_ping_ms,gw_loss_pct,cf_ping_ms,cf_loss_pct,g_ping_ms,g_loss_pct,dns_ms,http_ms,wifi_iface,wifi_ssid,wifi_band,status,error
 ```
 
 **Sample Row:**
 ```csv
-2025-11-05 04:13:51,70.993,29.246,98.846,20.615,2.0067,T-Mobile Fiber | Intrepid,56839,T-Mobile USA,6.2,0,18.4,0,21.3,0,16,102,ok,
+2025-11-05 04:13:51,70.993,29.246,98.846,20.615,2.0067,T-Mobile Fiber | Intrepid,56839,T-Mobile USA,6.2,0,18.4,0,21.3,0,16,102,eth0,Wired,Ethernet,ok,
 ```
