@@ -158,10 +158,25 @@ TSNOW="$(ts)"
 # --- Interface Discovery ---
 # We look for physical-looking interfaces that are UP and have an IP (excluding loopback)
 # Common prefixes: eth, en (ethernet), wlan, wl (wifi)
-mapfile -t INTERFACES < <(ip -br addr show | awk '$2=="UP" && $1 !~ /^lo/ && $1 !~ /^docker/ && $1 !~ /^veth/ {print $1}')
+mapfile -t RAW_INTERFACES < <(ip -br addr show | awk '$2=="UP" && $1 !~ /^lo/ && $1 !~ /^docker/ && $1 !~ /^veth/ {print $1}')
 
-if [ ${#INTERFACES[@]} -eq 0 ]; then
-  # Fallback to default behavior if no interfaces found
+INTERFACES=()
+for iface in "${RAW_INTERFACES[@]}"; do
+  # Strip '@if...' suffix common in Docker bridge networking
+  clean_iface="${iface%@*}"
+  
+  # Basic connectivity check: Can we reach a known public IP via this interface?
+  # This filters out internal-only or problematic interfaces that cause binding errors.
+  if ping -I "$clean_iface" -c 1 -w 2 8.8.8.8 >/dev/null 2>&1; then
+    INTERFACES+=("$clean_iface")
+  else
+    echo "$(ts) Skipping $clean_iface (No route to 8.8.8.8)" >> "$ERR_LOG"
+  fi
+done
+
+if [ ${#INTERFACES[@]} -le 1 ]; then
+  # If 0 or 1 interface, run in default mode (no specific interface binding)
+  # This is safest for single-NIC setups and Docker Desktop.
   INTERFACES=("default")
 fi
 
