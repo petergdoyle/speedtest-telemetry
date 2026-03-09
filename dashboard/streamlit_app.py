@@ -129,9 +129,11 @@ with st.sidebar:
     # Band & SSID filters
     bands = [b for b in sorted(df["wifi_band"].dropna().unique()) if b]
     ssids = [s for s in sorted(df["wifi_ssid"].dropna().unique()) if s]
+    ifaces = [i for i in sorted(df["wifi_iface"].dropna().unique()) if i]
 
     band_sel = st.multiselect("Network Band", options=bands, default=bands, help="Filter by Wi‑Fi band (2.4/5GHz) or Wired Ethernet.")
     ssid_sel = st.multiselect("Connected Network (SSID)", options=ssids, default=ssids, help="Filter by Wi‑Fi SSID or 'Wired' connection.")
+    iface_sel = st.multiselect("Physical Interface", options=ifaces, default=ifaces, help="Filter by the specific hardware interface (e.g., eth0, wlan0).")
 
     # Moving average window
     ma_window = st.slider("Moving Avg (samples)", 1, 21, 5, help="Smoothing window for trend lines")
@@ -144,6 +146,8 @@ if band_sel:
     mask &= df["wifi_band"].isin(band_sel)
 if ssid_sel:
     mask &= df["wifi_ssid"].isin(ssid_sel)
+if iface_sel:
+    mask &= df["wifi_iface"].isin(iface_sel)
 
 vf = df.loc[mask].copy()
 
