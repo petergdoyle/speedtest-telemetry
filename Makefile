@@ -65,6 +65,12 @@ debug:
 	@chmod +x scripts/debug-systemd.sh
 	@docker exec $(CONTAINER_NAME) bash -c "chmod +x /app/scripts/debug-systemd.sh && /app/scripts/debug-systemd.sh"
 
+# Clear the accumulated telemetry logs from the running container
+clean-logs:
+	@echo "⚠️  Clearing telemetry logs from inside the container..."
+	docker exec $(CONTAINER_NAME) bash -c "rm -f /var/lib/speedtest-telemetry/speedtest.csv /var/lib/speedtest-telemetry/errors.log /var/lib/speedtest-telemetry/raw/*.json"
+	@echo "✅ Logs cleared."
+
 # Remove the container and the associated data volume (Destructive!)
 clean:
 	docker compose down -v
