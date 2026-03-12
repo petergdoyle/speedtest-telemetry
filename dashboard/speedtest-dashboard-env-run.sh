@@ -46,4 +46,8 @@ fi
 
 # Launch app
 echo "🌐 Launching dashboard on port ${DASH_PORT:-8501}..."
-streamlit run streamlit_app.py --server.port="${DASH_PORT:-8501}" --server.address=0.0.0.0
+streamlit run streamlit_app.py \
+  --server.port="${DASH_PORT:-8501}" \
+  --server.address=0.0.0.0 \
+  --server.enableCORS=false \
+  --server.enableXsrfProtection=false
