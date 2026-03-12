@@ -16,3 +16,5 @@ __pycache__/
 *.pyc
 .venv/
 
+# Ignore root level CSV exports and logs
+*.csv
