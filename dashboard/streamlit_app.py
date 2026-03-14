@@ -24,6 +24,8 @@ import streamlit as st
 import altair as alt
 from datetime import datetime, timedelta
 
+from streamlit_autorefresh import st_autorefresh
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Configuration
 # ──────────────────────────────────────────────────────────────────────────────
@@ -41,11 +43,10 @@ st.set_page_config(
 st.title("📶 Speedtest Telemetry Dashboard")
 st.caption(f"CSV: `{CSV_PATH}` · Raw JSON: `{RAW_DIR}`")
 
-# Optional auto-refresh (disabled if 0)
+# Auto-refresh support
 if AUTO_REFRESH_SECS > 0:
-    st.query_params._ = str(int(datetime.utcnow().timestamp()))
-    st.autorefresh = st.rerun  # noop placeholder to avoid lints
-    st.write(f"⏱️ Auto-refresh ~ every {AUTO_REFRESH_SECS}s (reload the page to reset).")
+    st_autorefresh(interval=AUTO_REFRESH_SECS * 1000, key="data_refresh")
+    st.write(f"⏱️ Auto-refresh active: every {AUTO_REFRESH_SECS}s")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Data Loading & Normalization

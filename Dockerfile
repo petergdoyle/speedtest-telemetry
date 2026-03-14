@@ -43,8 +43,8 @@ RUN mkdir -p /var/lib/speedtest-telemetry/raw
 COPY scripts/ /app/scripts/
 COPY dashboard/ /app/dashboard/
 
-# Make telemetry script executable
-RUN chmod +x /app/scripts/speedtest-log.sh
+# Make scripts executable
+RUN chmod +x /app/scripts/speedtest-log.sh /app/scripts/archive-logs.sh
 
 # Setup Python environment for dashboard
 RUN python3 -m venv /app/.venv
@@ -53,12 +53,12 @@ RUN /app/.venv/bin/pip install --upgrade pip
 RUN if [ -f /app/dashboard/requirements.txt ]; then /app/.venv/bin/pip install -r /app/dashboard/requirements.txt; fi
 
 # Copy Systemd Services
-# We will use system-level services for Docker rather than user-level
 COPY systemd/system/ /etc/systemd/system/
 
 # Enable the systemd services
 RUN systemctl enable speedtest-logger.timer && \
-    systemctl enable speedtest-dashboard.service
+    systemctl enable speedtest-dashboard.service && \
+    systemctl enable speedtest-archiver.timer
 
 
 RUN systemctl set-default multi-user.target

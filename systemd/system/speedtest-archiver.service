@@ -1,0 +1,12 @@
+[Unit]
+Description=Speedtest Telemetry Archiving Service
+Wants=speedtest-archiver.timer
+
+[Service]
+Type=oneshot
+ExecStart=/app/scripts/archive-logs.sh
+Environment=SPEEDTEST_DATA=/var/lib/speedtest-telemetry
+Environment=SPEEDTEST_RETENTION_DAYS=90
+
+[Install]
+WantedBy=multi-user.target
