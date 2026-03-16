@@ -140,6 +140,9 @@ with st.sidebar:
     ma_window = st.slider("Moving Avg (samples)", 1, 21, 5, help="Smoothing window for trend lines")
 
 # Apply filters
+if len(date_range) != 2:
+    st.stop()
+
 start_dt = pd.to_datetime(datetime.combine(date_range[0], datetime.min.time()))
 end_dt = pd.to_datetime(datetime.combine(date_range[1], datetime.max.time()))
 mask = (df["timestamp"] >= start_dt) & (df["timestamp"] <= end_dt)
