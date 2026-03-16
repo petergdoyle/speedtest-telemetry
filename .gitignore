@@ -6,6 +6,7 @@ data/.speedtest.lock
 
 # macOS fluff (just in case)
 .DS_Store
+.vscode/
 
 # Vim swap files
 *.swp
