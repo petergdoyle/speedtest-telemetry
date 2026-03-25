@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv \
     sudo \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Ookla Speedtest CLI using pre-compiled binary

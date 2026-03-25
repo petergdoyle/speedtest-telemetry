@@ -7,6 +7,9 @@
 
 set -u
 
+# Force all timestamps to be recorded in Mountain Time
+export TZ="America/Denver"
+
 ############################
 # CONFIG
 ############################

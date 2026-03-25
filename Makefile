@@ -28,6 +28,10 @@ env:
 # Alias for env
 setup: env
 
+# Adjust timezone of logs (e.g., make adjust-tz FROM=UTC TO=America/Denver)
+adjust-tz:
+	@python3 scripts/adjust-timezone.py $(wildcard speedtest*.csv) --from-tz $(or $(FROM),UTC) --to-tz $(or $(TO),America/Denver)
+
 # Build the Docker image
 build:
 	docker compose build
