@@ -9,7 +9,4 @@ services:
       - "8501:8501" # Required for bridge networking
     volumes:
       - /sys/fs/cgroup:/sys/fs/cgroup:rw # Also required for systemd
-      - speedtest-data:/var/lib/speedtest-telemetry
-
-volumes:
-  speedtest-data:
+      - ./data:/var/lib/speedtest-telemetry

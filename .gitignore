@@ -1,8 +1,5 @@
 # Speedtest LOG DATA
-data/speedtest.csv
-data/raw/
-data/errors.log
-data/.speedtest.lock
+data/
 
 # macOS fluff (just in case)
 .DS_Store
