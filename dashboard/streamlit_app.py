@@ -203,13 +203,25 @@ base = alt.Chart(vf).encode(x=alt.X('timestamp:T', title='Time'))
 
 dl_line = base.mark_line().encode(
     y=alt.Y('download_mbps_ma{w}:Q'.format(w=ma_window), title='Download (Mb/s)'),
-    tooltip=['timestamp:T','download_mbps:Q','wifi_band:N','wifi_ssid:N']
+    tooltip=[
+        alt.Tooltip('timestamp:T', format='%Y-%m-%d %H:%M:%S', title='Time'),
+        alt.Tooltip('download_mbps:Q', title='Download (Mb/s)', format='.1f'),
+        alt.Tooltip('upload_mbps:Q', title='Upload (Mb/s)', format='.1f'),
+        alt.Tooltip('wifi_ssid:N', title='SSID'),
+        alt.Tooltip('wifi_band:N', title='Band')
+    ]
 )
 
 ul_line = base.mark_line().encode(
     y=alt.Y('upload_mbps_ma{w}:Q'.format(w=ma_window), title='Upload (Mb/s)'),
     color=alt.value('#999999'),
-    tooltip=['timestamp:T','upload_mbps:Q','wifi_band:N','wifi_ssid:N']
+    tooltip=[
+        alt.Tooltip('timestamp:T', format='%Y-%m-%d %H:%M:%S', title='Time'),
+        alt.Tooltip('download_mbps:Q', title='Download (Mb/s)', format='.1f'),
+        alt.Tooltip('upload_mbps:Q', title='Upload (Mb/s)', format='.1f'),
+        alt.Tooltip('wifi_ssid:N', title='SSID'),
+        alt.Tooltip('wifi_band:N', title='Band')
+    ]
 )
 
 band_color = alt.Color('wifi_band:N', legend=alt.Legend(title='Network Band'))
@@ -228,7 +240,15 @@ lat = base.transform_fold(
 ).mark_line().encode(
     y=alt.Y('value:Q', title='ms'),
     color='metric:N',
-    tooltip=['timestamp:T','metric:N','value:Q','wifi_band:N','wifi_ssid:N']
+    tooltip=[
+        alt.Tooltip('timestamp:T', format='%Y-%m-%d %H:%M:%S', title='Time'),
+        alt.Tooltip('metric:N', title='Metric'),
+        alt.Tooltip('value:Q', title='Value (ms)', format='.1f'),
+        alt.Tooltip('download_mbps:Q', title='Download (Mb/s)', format='.1f'),
+        alt.Tooltip('upload_mbps:Q', title='Upload (Mb/s)', format='.1f'),
+        alt.Tooltip('wifi_ssid:N', title='SSID'),
+        alt.Tooltip('wifi_band:N', title='Band')
+    ]
 )
 st.altair_chart(lat, use_container_width=True)
 
