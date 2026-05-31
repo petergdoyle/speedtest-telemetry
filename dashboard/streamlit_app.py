@@ -80,10 +80,17 @@ def load_csv(path: str, mtime: float) -> pd.DataFrame:
     # Parse timestamp
     def _parse_ts(x):
         try:
-            return pd.to_datetime(x)
+            ts = pd.to_datetime(x)
+            # Safeguard: Filter out any corrupted or extreme timestamps (e.g. year before 2020 or after 2035)
+            if pd.notna(ts) and (ts.year < 2020 or ts.year > 2035):
+                return pd.NaT
+            return ts
         except Exception:
             return pd.NaT
     df["timestamp"] = df["timestamp"].apply(_parse_ts)
+    
+    # Drop rows with invalid or corrupted timestamps
+    df.dropna(subset=["timestamp"], inplace=True)
     df.sort_values("timestamp", inplace=True)
 
     # Coerce numerics
