@@ -4,6 +4,9 @@ services:
     container_name: speedtest-telemetry
     restart: unless-stopped
     privileged: true # Required to run systemd inside the container
+    dns:
+      - 192.168.20.214
+      - 1.1.1.1
     # network_mode: host # REQUIRED for Linux/Proxmox to see physical interfaces. (Disabled on Mac/Windows)
     ports:
       - "8501:8501" # Required for bridge networking
