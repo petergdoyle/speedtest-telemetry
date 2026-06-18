@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     jq \
     dnsutils \
     iproute2 \
+    iputils-ping \
     iw \
     wireless-tools \
     kmod \
