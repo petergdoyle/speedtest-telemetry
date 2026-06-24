@@ -20,6 +20,16 @@ After creation, you **must** enable these features for Docker to function inside
 3. Check **keyctl** (required for Docker's security layer).
 4. Check **FUSE** (prevents file system driver errors).
 
+### Required Proxmox Host Configuration (ICMP Pings)
+By default, unprivileged LXC containers cannot open raw ICMP sockets, causing containerized ping telemetry to fail.
+To fix this, log into the **Proxmox Host (Hypervisor)** CLI and configure raw sockets globally:
+```bash
+# Allow ICMP echo sockets globally
+echo "net.ipv4.ping_group_range = 0 2147483647" | sudo tee /etc/sysctl.d/99-ping.conf
+sudo sysctl --system
+```
+*(LXC guests will automatically inherit this capability without needing host reboots).*
+
 ---
 
 ## 2. Network Strategy (Omada Controller)
@@ -140,6 +150,42 @@ To ensure the telemetry stack starts automatically when the Proxmox node reboots
   - **Forward Host**: `<LXC_IP_ADDRESS>`
   - **Forward Port**: `8501`
   - **Websockets Support**: Enabled (Required for Streamlit).
+
+---
+
+## 8. Network Optimization (Preventing Interface Stalls)
+
+Virtual Ethernet (`veth`) interfaces inside Proxmox LXC containers are known to stall or drop packets under high-throughput testing (such as speedtests) due to TCP Segmentation Offload (TSO) and Generic Segmentation Offload (GSO).
+
+To prevent connection drops and graph "holes," you must disable TSO/GSO/GRO on the LXC container's guest interface `eth0`:
+
+1. Install `ethtool` inside the guest LXC container:
+   ```bash
+   apt-get install -y ethtool
+   ```
+2. Disable offloading manually to verify:
+   ```bash
+   ethtool -K eth0 tso off gso off gro off
+   ```
+3. To make it persistent across guest reboots, register a one-shot systemd service inside the guest container:
+   Create `/etc/systemd/system/disable-tso.service`:
+   ```ini
+   [Unit]
+   Description=Disable TSO and GSO on eth0
+   After=network.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=/usr/sbin/ethtool -K eth0 tso off gso off gro off
+   RemainAfterExit=yes
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+4. Enable the service:
+   ```bash
+   systemctl enable --now disable-tso.service
+   ```
 
 ---
 

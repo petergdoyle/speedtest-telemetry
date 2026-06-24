@@ -78,6 +78,9 @@ Then check `make logger-logs` to see it execute in real-time.
 | **Port Conflict** | `make run` fails on port 8501 | Change `8501:8501` in `docker-compose.yml` to another port (e.g., `9000:8501`). |
 | **Permission Denied** | Logs won't write to `/var/lib/...` | The container runs as root by default. Ensure the host path for the volume is accessible. |
 | **Speedtest CLI Crash** | `std::logic_error` in logs | Ensure `Environment=HOME=/root` is set in the systemd service file (it should be by default in this repo). |
+| **Network Stalls / Holes in Graph** | Connection drops, high packet loss, graph gaps | Disable TSO/GSO/GRO on the LXC host interface using `ethtool -K eth0 tso off gso off gro off`. |
+| **100% Packet Loss on Pings** | `cf_loss_pct` and `g_loss_pct` flatline at 100% | Enable raw ICMP sockets globally on the Proxmox host using `sysctl -w net.ipv4.ping_group_range="0 2147483647"`. |
+| **Persistent DNS Failure** | `HostNotFoundException` after brief drop | Disable `systemd-resolved` inside the Docker image to prevent DNS locking/caching conflicts. |
 
 ---
 
