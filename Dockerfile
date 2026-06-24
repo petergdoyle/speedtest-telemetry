@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     iw \
     wireless-tools \
     kmod \
+    make \
     python3 \
     python3-pip \
     python3-venv \
@@ -57,10 +58,11 @@ RUN if [ -f /app/dashboard/requirements.txt ]; then /app/.venv/bin/pip install -
 # Copy Systemd Services
 COPY systemd/system/ /etc/systemd/system/
 
-# Enable the systemd services
+# Enable the systemd services and disable systemd-resolved to prevent DNS locking conflicts
 RUN systemctl enable speedtest-logger.timer && \
     systemctl enable speedtest-dashboard.service && \
-    systemctl enable speedtest-archiver.timer
+    systemctl enable speedtest-archiver.timer && \
+    systemctl disable systemd-resolved
 
 
 RUN systemctl set-default multi-user.target

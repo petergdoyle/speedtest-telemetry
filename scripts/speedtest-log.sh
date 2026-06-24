@@ -140,7 +140,7 @@ discover_servers() {
   # Parse first column (ID) after the "====" divider; take top SERVER_LIMIT
   # Handles leading spaces; prints only numeric IDs
   mapfile -t SERVERS < <(
-    "$BIN" -L --accept-license --accept-gdpr 2>/dev/null | awk '
+    timeout 15 "$BIN" -L --accept-license --accept-gdpr 2>/dev/null | awk '
       /^=+/ {start=1; next}
       start && /^[[:space:]]*[0-9]+/ {
         gsub(/^[[:space:]]+/, "", $1);
@@ -245,7 +245,9 @@ for IFACE in "${INTERFACES[@]}"; do
   last_err=""
   SUCCESS=0
 
+  echo "$(ts) Starting speedtest iterations. Discovered servers: ${SERVERS[*]}" >> "$ERR_LOG"
   for sid in "${SERVERS[@]}"; do
+    echo "$(ts) Trying server $sid (Max attempts per server: $TRIES_PER_SERVER)" >> "$ERR_LOG"
     for (( i=1; i<=TRIES_PER_SERVER; i++ )); do
       total_tries=$((total_tries+1))
       
@@ -254,20 +256,35 @@ for IFACE in "${INTERFACES[@]}"; do
       [ -n "$sid" ] && cmd+=("--server-id" "$sid")
       [ "$IFACE" != "default" ] && cmd+=("--interface" "$IFACE")
       
-      result=$(timeout "$CMD_TIMEOUT" "${cmd[@]}" 2>&1); rc=$?
+      echo "$(ts) Executing: ${cmd[*]} (Try $i, Total tries: $total_tries)" >> "$ERR_LOG"
+      result=$(timeout -k 10 "$CMD_TIMEOUT" "${cmd[@]}" 2>&1); rc=$?
       
       if [ $rc -eq 0 ] && echo "$result" | jq -e . >/dev/null 2>&1; then
         write_ok_row "$TSNOW" "$result" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
         SUCCESS=1
+        echo "$(ts) Server $sid succeeded." >> "$ERR_LOG"
         break 2
       else
         short_err="$(echo "$result" | tr '\n' ' ' | cut -c1-240)"
-        echo "$TSNOW iface=$IFACE sid=$sid try=$i rc=$rc err=$short_err" >> "$ERR_LOG"
+        
+        # Gather detailed DNS diagnostic info at moment of failure
+        local nameservers dns_lookup_google dns_lookup_ookla resolv_content
+        nameservers=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}' | paste -sd, - || echo "none")
+        dns_lookup_google=$(dig +short +tries=1 +timeout=2 google.com 2>&1 | tr '\n' ' ' || echo "failed")
+        dns_lookup_ookla=$(dig +short +tries=1 +timeout=2 connectivity.speedtest.net 2>&1 | tr '\n' ' ' || echo "failed")
+        resolv_content=$(cat /etc/resolv.conf | grep -v '^#' | tr '\n' ' ' || echo "empty")
+        
+        echo "$TSNOW iface=$IFACE sid=$sid try=$i rc=$rc err=$short_err [DNS Debug: resolvers=$nameservers | google_lookup=$dns_lookup_google | ookla_lookup=$dns_lookup_ookla | resolv.conf=$resolv_content]" >> "$ERR_LOG"
         last_err="$short_err"
         sleep $((BACKOFF_BASE * i))
       fi
       [ $total_tries -ge $GLOBAL_MAX_TRIES ] && break 2
     done
+    if [ $SUCCESS -eq 1 ]; then
+      break
+    else
+      echo "$(ts) Server $sid failed. Iterating to next server..." >> "$ERR_LOG"
+    fi
   done
 
   if [ $SUCCESS -eq 0 ]; then
