@@ -286,6 +286,126 @@ else:
     st.write("✅ No failures in the selected range.")
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Errors & Diagnostics Log
+# ──────────────────────────────────────────────────────────────────────────────
+st.divider()
+st.subheader("📂 Errors & Diagnostics Log (`errors.log`)")
+
+ERR_LOG_PATH = os.getenv("SPEEDTEST_ERR_LOG", os.path.join(os.path.dirname(CSV_PATH), "errors.log"))
+
+@st.cache_data(show_spinner=False)
+def load_errors_log(path: str, mtime: float) -> pd.DataFrame:
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    
+    import re
+    rows = []
+    try:
+        with open(path, "r", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Match timestamp at start of line
+                if len(line) >= 19:
+                    ts_str = line[:19]
+                    try:
+                        ts = pd.to_datetime(ts_str)
+                        rest = line[20:].strip()
+                    except Exception:
+                        ts = pd.NaT
+                        rest = line
+                else:
+                    ts = pd.NaT
+                    rest = line
+                
+                # Check if this is a structured error line
+                if "iface=" in rest or "sid=" in rest or "err=" in rest:
+                    m_iface = re.search(r'iface=(\S+)', rest)
+                    m_sid = re.search(r'sid=(\S+)', rest)
+                    m_name = re.search(r'name="([^"]+)"', rest)
+                    m_host = re.search(r'host="([^"]+)"', rest)
+                    m_try = re.search(r'try=(\S+)', rest)
+                    m_rc = re.search(r'rc=(\S+)', rest)
+                    m_err = re.search(r'err=(.+)', rest)
+                    
+                    iface = m_iface.group(1) if m_iface else ""
+                    sid = m_sid.group(1) if m_sid else ""
+                    name = m_name.group(1) if m_name else ""
+                    host = m_host.group(1) if m_host else ""
+                    try_count = m_try.group(1) if m_try else ""
+                    rc = m_rc.group(1) if m_rc else ""
+                    err = m_err.group(1) if m_err else rest
+                    
+                    rows.append({
+                        "timestamp": ts,
+                        "type": "ERROR",
+                        "interface": iface,
+                        "server_id": sid,
+                        "server_name": name,
+                        "server_host": host,
+                        "attempt": try_count,
+                        "return_code": rc,
+                        "message": err
+                    })
+                else:
+                    # Info or startup line
+                    rows.append({
+                        "timestamp": ts,
+                        "type": "INFO",
+                        "interface": "",
+                        "server_id": "",
+                        "server_name": "",
+                        "server_host": "",
+                        "attempt": "",
+                        "return_code": "",
+                        "message": rest
+                    })
+    except Exception as e:
+        rows.append({
+            "timestamp": pd.NaT,
+            "type": "SYSTEM",
+            "interface": "",
+            "server_id": "",
+            "server_name": "",
+            "server_host": "",
+            "attempt": "",
+            "return_code": "",
+            "message": f"Failed to read errors.log: {str(e)}"
+        })
+                
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df.sort_values("timestamp", ascending=False, inplace=True)
+    return df
+
+err_mtime = os.path.getmtime(ERR_LOG_PATH) if os.path.exists(ERR_LOG_PATH) else 0
+err_df = load_errors_log(ERR_LOG_PATH, err_mtime)
+
+if not err_df.empty:
+    log_type = st.radio("Log type filter", options=["All events", "Errors only", "System info only"], horizontal=True)
+    if log_type == "Errors only":
+        filtered_err_df = err_df[err_df["type"] == "ERROR"]
+    elif log_type == "System info only":
+        filtered_err_df = err_df[err_df["type"] == "INFO"]
+    else:
+        filtered_err_df = err_df
+
+    err_csv_bytes = filtered_err_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Diagnostic Logs (CSV)",
+        data=err_csv_bytes,
+        file_name=f"speedtest_diagnostics.csv",
+        mime="text/csv",
+        help="Download the filtered errors and diagnostic events."
+    )
+    
+    st.dataframe(filtered_err_df, use_container_width=True)
+else:
+    st.info(f"No diagnostic logs found at `{ERR_LOG_PATH}`.")
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Raw JSON summary (optional quick view)
 # ──────────────────────────────────────────────────────────────────────────────
 raw_count = 0

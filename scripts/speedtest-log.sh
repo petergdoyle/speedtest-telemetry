@@ -33,6 +33,44 @@ HTTP_URL="https://www.google.com/generate_204"
 # Static fallback (used only if dynamic discovery fails)
 STATIC_SERVERS=(56839 8862 24079 61397 51010 23971 10051 16797 53975 14861 47683)
 
+# Hardcoded details for static servers in case dynamic discovery is offline
+declare -A STATIC_SERVER_HOSTS
+declare -A STATIC_SERVER_NAMES
+
+STATIC_SERVER_HOSTS[56839]="speedtest.denver.intrepidfiber.com"
+STATIC_SERVER_NAMES[56839]="T-Mobile Fiber | Intrepid"
+
+STATIC_SERVER_HOSTS[8862]="denver.speedtest.centurylink.net"
+STATIC_SERVER_NAMES[8862]="CenturyLink"
+
+STATIC_SERVER_HOSTS[24079]="den11-speedtest01.as15108.com"
+STATIC_SERVER_NAMES[24079]="ALLO - Denver"
+
+STATIC_SERVER_HOSTS[61397]="st-denver.sumofiber.com"
+STATIC_SERVER_NAMES[61397]="SUMOFIBER"
+
+STATIC_SERVER_HOSTS[51010]="stden.highlinefast.com"
+STATIC_SERVER_NAMES[51010]="Highline"
+
+STATIC_SERVER_HOSTS[10051]="stosat-dvre-01.sys.comcast.net"
+STATIC_SERVER_NAMES[10051]="Comcast"
+
+STATIC_SERVER_HOSTS[63940]="den-speedtest.net.sangoma.net"
+STATIC_SERVER_NAMES[63940]="Sangoma"
+
+STATIC_SERVER_HOSTS[69490]="denver.speed.vcn.com"
+STATIC_SERVER_NAMES[69490]="Visionary Broadband"
+
+STATIC_SERVER_HOSTS[69052]="speedtest-denver.hyperfiber.com"
+STATIC_SERVER_NAMES[69052]="RippleFiber"
+
+STATIC_SERVER_HOSTS[64798]="dende0004speedtestserver01.wiline.com"
+STATIC_SERVER_NAMES[64798]="WiLine Networks"
+
+STATIC_SERVER_HOSTS[55925]="denver-speedtest.commnetbroadband.com"
+STATIC_SERVER_NAMES[55925]="Commnet Broadband"
+
+
 ############################
 # SETUP
 ############################
@@ -137,17 +175,18 @@ write_fail_row() {
 }
 
 discover_servers() {
-  # Parse first column (ID) after the "====" divider; take top SERVER_LIMIT
-  # Handles leading spaces; prints only numeric IDs
-  mapfile -t SERVERS < <(
-    timeout 15 "$BIN" -L --accept-license --accept-gdpr 2>/dev/null | awk '
-      /^=+/ {start=1; next}
-      start && /^[[:space:]]*[0-9]+/ {
-        gsub(/^[[:space:]]+/, "", $1);
-        print $1
-      }
-    ' | head -n "$SERVER_LIMIT"
-  )
+  local json
+  json=$(timeout 15 "$BIN" -L --accept-license --accept-gdpr --format=json 2>/dev/null)
+  if [ $? -eq 0 ] && [ -n "$json" ]; then
+    SERVERS=()
+    while IFS=$'\t' read -r sid host name; do
+      if [ -n "$sid" ]; then
+        SERVERS+=("$sid")
+        SERVER_HOSTS["$sid"]="$host"
+        SERVER_NAMES["$sid"]="$name"
+      fi
+    done < <(echo "$json" | jq -r '.servers[] | "\(.id)\t\(.host)\t\(.name)"' 2>/dev/null)
+  fi
 }
 
 ############################
@@ -235,10 +274,18 @@ for IFACE in "${INTERFACES[@]}"; do
   fi
 
   # Build dynamic server list
+  declare -A SERVER_HOSTS
+  declare -A SERVER_NAMES
+  
   SERVERS=()
   discover_servers
+  
   if [ ${#SERVERS[@]} -eq 0 ]; then
     SERVERS=("${STATIC_SERVERS[@]}")
+    for sid in "${STATIC_SERVERS[@]}"; do
+      SERVER_HOSTS["$sid"]="${STATIC_SERVER_HOSTS[$sid]:-unknown.host}"
+      SERVER_NAMES["$sid"]="${STATIC_SERVER_NAMES[$sid]:-unknown}"
+    done
   fi
 
   total_tries=0
@@ -247,7 +294,9 @@ for IFACE in "${INTERFACES[@]}"; do
 
   echo "$(ts) Starting speedtest iterations. Discovered servers: ${SERVERS[*]}" >> "$ERR_LOG"
   for sid in "${SERVERS[@]}"; do
-    echo "$(ts) Trying server $sid (Max attempts per server: $TRIES_PER_SERVER)" >> "$ERR_LOG"
+    local host_name="${SERVER_HOSTS[$sid]:-unknown.host}"
+    local s_name="${SERVER_NAMES[$sid]:-unknown}"
+    echo "$(ts) Trying server $sid ($s_name - $host_name) (Max attempts per server: $TRIES_PER_SERVER)" >> "$ERR_LOG"
     for (( i=1; i<=TRIES_PER_SERVER; i++ )); do
       total_tries=$((total_tries+1))
       
@@ -262,19 +311,20 @@ for IFACE in "${INTERFACES[@]}"; do
       if [ $rc -eq 0 ] && echo "$result" | jq -e . >/dev/null 2>&1; then
         write_ok_row "$TSNOW" "$result" "$GW_AVG" "$GW_LOSS" "$CF_AVG" "$CF_LOSS" "$G_AVG" "$G_LOSS" "$DNS_MS" "$HTTP_MS"
         SUCCESS=1
-        echo "$(ts) Server $sid succeeded." >> "$ERR_LOG"
+        echo "$(ts) Server $sid ($s_name) succeeded." >> "$ERR_LOG"
         break 2
       else
         short_err="$(echo "$result" | tr '\n' ' ' | cut -c1-240)"
         
         # Gather detailed DNS diagnostic info at moment of failure
-        local nameservers dns_lookup_google dns_lookup_ookla resolv_content
+        local nameservers dns_lookup_google dns_lookup_ookla resolv_content dns_lookup_server
         nameservers=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}' | paste -sd, - || echo "none")
         dns_lookup_google=$(dig +short +tries=1 +timeout=2 google.com 2>&1 | tr '\n' ' ' || echo "failed")
         dns_lookup_ookla=$(dig +short +tries=1 +timeout=2 connectivity.speedtest.net 2>&1 | tr '\n' ' ' || echo "failed")
+        dns_lookup_server=$(dig +short +tries=1 +timeout=2 "$host_name" 2>&1 | tr '\n' ' ' || echo "failed")
         resolv_content=$(cat /etc/resolv.conf | grep -v '^#' | tr '\n' ' ' || echo "empty")
         
-        echo "$TSNOW iface=$IFACE sid=$sid try=$i rc=$rc err=$short_err [DNS Debug: resolvers=$nameservers | google_lookup=$dns_lookup_google | ookla_lookup=$dns_lookup_ookla | resolv.conf=$resolv_content]" >> "$ERR_LOG"
+        echo "$TSNOW iface=$IFACE sid=$sid name=\"$s_name\" host=\"$host_name\" try=$i rc=$rc err=$short_err [DNS Debug: resolvers=$nameservers | google_lookup=$dns_lookup_google | ookla_lookup=$dns_lookup_ookla | server_lookup=$dns_lookup_server | resolv.conf=$resolv_content]" >> "$ERR_LOG"
         last_err="$short_err"
         sleep $((BACKOFF_BASE * i))
       fi
