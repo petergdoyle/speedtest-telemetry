@@ -169,7 +169,7 @@ write_ok_row() {
 write_fail_row() {
   local TS="$1" MSG="$2" gw_avg="$3" gw_loss="$4" cf_avg="$5" cf_loss="$6" g_avg="$7" g_loss="$8" dns_ms="$9" http_ms="${10}"
   local ERR
-  ERR=$(echo "$MSG" | tr '\n' ' ' | sed 's/,/;/g' | cut -c1-240)
+  ERR=$(echo "$MSG" | tr '\n' ' ' | sed -e 's/,/;/g' -e "s/\"/'/g" | cut -c1-1500)
   # 21 commas: 1:TS, 2-9:empty, 10-15:pings, 16-17:telemetry, 18-20:wifi, 21:fail, 22:error
   echo "$TS,,,,,,,,,${gw_avg:-},${gw_loss:-},${cf_avg:-},${cf_loss:-},${g_avg:-},${g_loss:-},${dns_ms:-},${http_ms:-},$WIFI_IFACE,\"$WIFI_SSID\",$WIFI_BAND,fail,\"$ERR\"" >> "$CSV"
 }
@@ -314,18 +314,19 @@ for IFACE in "${INTERFACES[@]}"; do
         echo "$(ts) Server $sid ($s_name) succeeded." >> "$ERR_LOG"
         break 2
       else
-        short_err="$(echo "$result" | tr '\n' ' ' | cut -c1-240)"
+        short_err="$(echo "$result" | tr '\n' ' ' | cut -c1-1000)"
         
         # Gather detailed DNS diagnostic info at moment of failure
-        local nameservers dns_lookup_google dns_lookup_ookla resolv_content dns_lookup_server
+        local nameservers dns_lookup_google dns_lookup_ookla resolv_content dns_lookup_server dns_diag
         nameservers=$(grep '^nameserver' /etc/resolv.conf | awk '{print $2}' | paste -sd, - || echo "none")
         dns_lookup_google=$(dig +short +tries=1 +timeout=2 google.com 2>&1 | tr '\n' ' ' || echo "failed")
         dns_lookup_ookla=$(dig +short +tries=1 +timeout=2 connectivity.speedtest.net 2>&1 | tr '\n' ' ' || echo "failed")
         dns_lookup_server=$(dig +short +tries=1 +timeout=2 "$host_name" 2>&1 | tr '\n' ' ' || echo "failed")
         resolv_content=$(cat /etc/resolv.conf | grep -v '^#' | tr '\n' ' ' || echo "empty")
+        dns_diag="[DNS Debug: resolvers=$nameservers | google_lookup=$dns_lookup_google | ookla_lookup=$dns_lookup_ookla | server_lookup=$dns_lookup_server | resolv.conf=$resolv_content]"
         
-        echo "$TSNOW iface=$IFACE sid=$sid name=\"$s_name\" host=\"$host_name\" try=$i rc=$rc err=$short_err [DNS Debug: resolvers=$nameservers | google_lookup=$dns_lookup_google | ookla_lookup=$dns_lookup_ookla | server_lookup=$dns_lookup_server | resolv.conf=$resolv_content]" >> "$ERR_LOG"
-        last_err="$short_err"
+        echo "$TSNOW iface=$IFACE sid=$sid name=\"$s_name\" host=\"$host_name\" try=$i rc=$rc err=$short_err $dns_diag" >> "$ERR_LOG"
+        last_err="Server $sid ($s_name) failed (try $i): $short_err | $dns_diag"
         sleep $((BACKOFF_BASE * i))
       fi
       [ $total_tries -ge $GLOBAL_MAX_TRIES ] && break 2
